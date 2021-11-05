@@ -29,6 +29,22 @@ ENGINE_DOCKER = "docker"
 ENGINE_ALL = [ENGINE_PODMAN, ENGINE_CRIO, ENGINE_DOCKER]
 
 
+def in_json(*path, default=None):
+    def get_function(function):
+        def wrapper(self, data, *args):
+            tmp = data
+            for i in path:
+                if i in tmp:
+                    tmp = data[i]
+                else:
+                    return default
+            return function(self, data, *args)
+
+        return wrapper
+
+    return get_function
+
+
 def json_is_podman_or_docker_format(json_rep):
     """Check if the inspected file is in a format from docker or podman.
 
@@ -98,14 +114,18 @@ class EngineHelper(abc.ABC):
 
 
 class PodmanDockerHelper(EngineHelper):
+    @in_json(0, "HostConfig", "Devices")
     def get_devices(self, data):
         return data[0]["HostConfig"]["Devices"]
 
+    @in_json(0, "Mounts")
     def get_mounts(self, data):
         return data[0]["Mounts"]
 
+    @in_json(0, "NetworkSettings", "Ports")
     def get_ports(self, data):
         ports = []
+
         for key, value in data[0]["NetworkSettings"]["Ports"].items():
             container_port = str(key).split("/")
             new_port = {
@@ -135,21 +155,28 @@ class DockerHelper(PodmanDockerHelper):
         self.adjust_json_from_docker(json_rep)
         return json_rep
 
-    def adjust_json_from_docker(self, json_rep):
-        """If the json comes from a docker call, we need to adjust it to make use
-        of it."""
-
-        if not isinstance(json_rep[0]["NetworkSettings"]["Ports"], dict):
+    @in_json(0, "NetworkSettings", "Ports")
+    def check_network_port_type(self, data):
+        if not isinstance(data[0]["NetworkSettings"]["Ports"], dict):
             raise Exception(
                 "Error parsing docker engine inspection JSON structure, try to specify container engine using '--container-engine' parameter"
             )
 
-        for item in json_rep[0]["Mounts"]:
+    @in_json(0, "Mounts")
+    def deal_with_mounts(self, data):
+        for item in data[0]["Mounts"]:
             item["source"] = item["Source"]
             if item["Mode"] == "rw":
                 item["options"] = "rw"
             if item["Mode"] == "ro":
                 item["options"] = "ro"
+
+    def adjust_json_from_docker(self, json_rep):
+        """If the json comes from a docker call, we need to adjust it to make use
+        of it."""
+
+        self.check_network_port_type(json_rep)
+        self.deal_with_mounts(json_rep)
 
 
 class CrioHelper(EngineHelper):

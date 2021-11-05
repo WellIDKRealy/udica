@@ -149,15 +149,16 @@ def create_policy(
         policy.write("\n")
 
     # ports
-    for item in sorted(ports, key=lambda x: x.get("portNumber", 0)):
-        if "portNumber" in item:
-            policy.write(
-                "    (allow process "
-                + list_ports(item["portNumber"], item["protocol"])
-                + " ( "
-                + perms.socket[item["protocol"]]
-                + " (  name_bind ))) \n"
-            )
+    if ports:
+        for item in sorted(ports, key=lambda x: x.get("portNumber", 0)):
+            if "portNumber" in item:
+                policy.write(
+                    "    (allow process "
+                    + list_ports(item["portNumber"], item["protocol"])
+                    + " ( "
+                    + perms.socket[item["protocol"]]
+                    + " (  name_bind ))) \n"
+                )
 
     # devices
     # Not applicable for CRI-O container engine
@@ -295,128 +296,130 @@ def write_policy_for_crio_mounts(mounts, policy):
 
 
 def write_policy_for_podman_devices(devices, policy):
-    for item in sorted(devices, key=lambda x: str(x["PathOnHost"])):
-        contexts = list_contexts(item["PathOnHost"])
-        for context in contexts:
-            policy.write(
-                "    (allow process "
-                + context
-                + " ( blk_file ( "
-                + perms.perm["device_rw"]
-                + " ))) \n"
-            )
-            policy.write(
-                "    (allow process "
-                + context
-                + " ( chr_file ( "
-                + perms.perm["device_rw"]
-                + " ))) \n"
-            )
+    if devices:
+        for item in sorted(devices, key=lambda x: str(x["PathOnHost"])):
+            contexts = list_contexts(item["PathOnHost"])
+            for context in contexts:
+                policy.write(
+                    "    (allow process "
+                    + context
+                    + " ( blk_file ( "
+                    + perms.perm["device_rw"]
+                    + " ))) \n"
+                )
+                policy.write(
+                    "    (allow process "
+                    + context
+                    + " ( chr_file ( "
+                    + perms.perm["device_rw"]
+                    + " ))) \n"
+                )
 
 
 def write_policy_for_podman_mounts(mounts, policy):
-    for item in sorted(mounts, key=lambda x: str(x["Source"])):
-        if not item["Source"].find("/"):
-            if item["Source"] == LOG_CONTAINER and item["RW"] is False:
-                policy.write("    (blockinherit log_container)\n")
-                add_template("log_container")
-                continue
+    if mounts:
+        for item in sorted(mounts, key=lambda x: str(x["Source"])):
+            if not item["Source"].find("/"):
+                if item["Source"] == LOG_CONTAINER and item["RW"] is False:
+                    policy.write("    (blockinherit log_container)\n")
+                    add_template("log_container")
+                    continue
 
-            if item["Source"] == LOG_CONTAINER and item["RW"] is True:
-                policy.write("    (blockinherit log_rw_container)\n")
-                add_template("log_container")
-                continue
+                if item["Source"] == LOG_CONTAINER and item["RW"] is True:
+                    policy.write("    (blockinherit log_rw_container)\n")
+                    add_template("log_container")
+                    continue
 
-            if item["Source"] == HOME_CONTAINER and item["RW"] is False:
-                policy.write("    (blockinherit home_container)\n")
-                add_template("home_container")
-                continue
+                if item["Source"] == HOME_CONTAINER and item["RW"] is False:
+                    policy.write("    (blockinherit home_container)\n")
+                    add_template("home_container")
+                    continue
 
-            if item["Source"] == HOME_CONTAINER and item["RW"] is True:
-                policy.write("    (blockinherit home_rw_container)\n")
-                add_template("home_container")
-                continue
+                if item["Source"] == HOME_CONTAINER and item["RW"] is True:
+                    policy.write("    (blockinherit home_rw_container)\n")
+                    add_template("home_container")
+                    continue
 
-            if item["Source"] == TMP_CONTAINER and item["RW"] is False:
-                policy.write("    (blockinherit tmp_container)\n")
-                add_template("tmp_container")
-                continue
+                if item["Source"] == TMP_CONTAINER and item["RW"] is False:
+                    policy.write("    (blockinherit tmp_container)\n")
+                    add_template("tmp_container")
+                    continue
 
-            if item["Source"] == TMP_CONTAINER and item["RW"] is True:
-                policy.write("    (blockinherit tmp_rw_container)\n")
-                add_template("tmp_container")
-                continue
+                if item["Source"] == TMP_CONTAINER and item["RW"] is True:
+                    policy.write("    (blockinherit tmp_rw_container)\n")
+                    add_template("tmp_container")
+                    continue
 
-            if item["Source"] == CONFIG_CONTAINER and item["RW"] is False:
-                policy.write("    (blockinherit config_container)\n")
-                add_template("config_container")
-                continue
+                if item["Source"] == CONFIG_CONTAINER and item["RW"] is False:
+                    policy.write("    (blockinherit config_container)\n")
+                    add_template("config_container")
+                    continue
 
-            if item["Source"] == CONFIG_CONTAINER and item["RW"] is True:
-                policy.write("    (blockinherit config_rw_container)\n")
-                add_template("config_container")
-                continue
+                if item["Source"] == CONFIG_CONTAINER and item["RW"] is True:
+                    policy.write("    (blockinherit config_rw_container)\n")
+                    add_template("config_container")
+                    continue
 
-            contexts = list_contexts(item["Source"])
-            for context in contexts:
-                if item["RW"] is True:
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( dir ( "
-                        + perms.perm["dir_rw"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( file ( "
-                        + perms.perm["file_rw"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( fifo_file ( "
-                        + perms.perm["fifo_rw"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( sock_file ( "
-                        + perms.perm["socket_rw"]
-                        + " ))) \n"
-                    )
-                if item["RW"] is False:
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( dir ( "
-                        + perms.perm["dir_ro"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( file ( "
-                        + perms.perm["file_ro"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( fifo_file ( "
-                        + perms.perm["fifo_ro"]
-                        + " ))) \n"
-                    )
-                    policy.write(
-                        "    (allow process "
-                        + context
-                        + " ( sock_file ( "
-                        + perms.perm["socket_ro"]
-                        + " ))) \n"
-                    )
+                contexts = list_contexts(item["Source"])
+                for context in contexts:
+                    if item["RW"] is True:
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( dir ( "
+                            + perms.perm["dir_rw"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( file ( "
+                            + perms.perm["file_rw"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( fifo_file ( "
+                            + perms.perm["fifo_rw"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( sock_file ( "
+                            + perms.perm["socket_rw"]
+                            + " ))) \n"
+                        )
+                    if item["RW"] is False:
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( dir ( "
+                            + perms.perm["dir_ro"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( file ( "
+                            + perms.perm["file_ro"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( fifo_file ( "
+                            + perms.perm["fifo_ro"]
+                            + " ))) \n"
+                        )
+                        policy.write(
+                            "    (allow process "
+                            + context
+                            + " ( sock_file ( "
+                            + perms.perm["socket_ro"]
+                            + " ))) \n"
+                        )
 
 
 def load_policy(opts):
